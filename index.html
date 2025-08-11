@@ -56,14 +56,14 @@
 
     dialog#lightbox{border:none; padding:0; background:transparent}
     .lightbox-wrap{background:rgba(0,0,0,.75); backdrop-filter:blur(4px); display:grid; place-items:center; width:100vw; height:100vh}
-    .lightbox{max-width:min(92vw,1100px); max-height:88vh; background:var(--panel); border:var(--border); border-radius:16px; box-shadow:var(--shadow); padding:10px}
+    .lightbox{width:fit-content; max-width:min(92vw,1100px); max-height:88vh; background:var(--panel); border:var(--border); border-radius:16px; box-shadow:var(--shadow); padding:10px}
     .lightbox img{width:100%; height:60vh; object-fit:contain; background:#05050a}
 
     footer{padding:24px 0 42px; color:var(--muted)}
     @media (max-width:960px){ .hero-grid{grid-template-columns:1fr} .grid{grid-template-columns:1fr} .cards{grid-template-columns:1fr 1fr} }
     @media (max-width:640px){ .cards{grid-template-columns:1fr} }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2" defer></script>
 </head>
 <body>
   <header>
@@ -81,8 +81,6 @@
         <button id="themeBtn" class="btn" type="button" aria-pressed="false">🌓 Тема</button>
         <button id="cloudBtn" class="btn" type="button" title="Включить онлайн‑синхронизацию">☁ Онлайн: выкл</button>
         <button id="settingsBtn" class="btn" type="button" title="Настройки облака">⚙ Настройки</button>
-        <button id="exportBtn" class="btn" type="button" title="Экспорт базы">⤴ Экспорт</button>
-        <button id="importBtn" class="btn" type="button" title="Импорт базы">⤵ Импорт</button>
         <a class="btn primary" href="#/characters">Создать персонажа</a>
       </nav>
     </div>
@@ -253,11 +251,6 @@
   function openLightbox(it){ lbImg.src=it.avatar||placeholderSvg(); lbName.textContent=it.name; lbMeta.textContent=[it.race,it.cls,it.bg,it.aln].filter(Boolean).join(' • '); lbDesc.textContent=it.desc||''; dlBtn.onclick=()=> downloadDataUrl(it.avatar||placeholderSvg(), (it.name||'portrait')+'.jpg'); lb.showModal(); }
   lb.addEventListener('click', (e)=>{ if(e.target.hasAttribute('data-close')) lb.close(); }); addEventListener('keydown', (e)=>{ if(e.key==='Escape'&&lb.open) lb.close(); });
 
-  // ===== Экспорт / Импорт =====
-  const exportBtn=document.getElementById('exportBtn'); const importBtn=document.getElementById('importBtn');
-  exportBtn.addEventListener('click', ()=>{ const blob=new Blob([JSON.stringify(chars)], {type:'application/json'}); const url=URL.createObjectURL(blob); const a=Object.assign(document.createElement('a'), {href:url, download:'dnd-characters-backup.json'}); a.click(); URL.revokeObjectURL(url); });
-  importBtn.addEventListener('click', async ()=>{ const inp=Object.assign(document.createElement('input'), {type:'file', accept:'application/json'}); inp.onchange=async ()=>{ const file=inp.files?.[0]; if(!file) return; try{ const data=JSON.parse(await file.text()); if(!Array.isArray(data)) throw new Error('Ожидается массив'); chars=data.filter(x=>x&&x.name); saveLocal(); render(); }catch(e){ alert('Не удалось импортировать: '+e.message); } }; inp.click(); });
-
   // ===== Настройки облака =====
   settingsBtn.addEventListener('click', ()=>{ const cfg=loadCfg()||{}; supUrl.value=cfg.url||''; supKey.value=cfg.key||''; supBucket.value=cfg.bucket||'characters'; settingsDlg.showModal(); });
   closeSettings.addEventListener('click', ()=> settingsDlg.close());
@@ -282,287 +275,4 @@
   </script>
 </body>
 </html>
-<!doctype html>
-<html lang="ru" data-mode="local">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <meta name="color-scheme" content="light dark" />
-  <title>Fantasy Forge — Персонажи D&D (онлайн/офлайн)</title>
-  <meta name="description" content="Создавайте D&D‑персонажей с фото и описанием. Работает офлайн (localStorage) и онлайн (Supabase: Postgres + Storage)." />
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
-  <style>
-    :root{ --bg:#0e0a12; --bg-accent: radial-gradient(900px 520px at 10% -10%, rgba(147,97,255,.12), transparent 60%), radial-gradient(820px 520px at 110% 0%, rgba(245,198,97,.12), transparent 60%), radial-gradient(720px 600px at 50% 110%, rgba(61,199,171,.10), transparent 60%); --panel:#16111d; --panel-2:#1c1626; --text:#efe9ff; --muted:#b8a9d9; --gold:#f5c661; --accent:#a685ff; --ring:rgba(246,216,130,.35); --radius:18px; --shadow:0 12px 28px rgba(0,0,0,.45); --border:1px solid rgba(255,255,255,.10); }
-    :root.light{ --bg:#fbf7ef; --bg-accent: radial-gradient(900px 500px at -10% -10%, rgba(166,133,255,.14), transparent 60%), radial-gradient(700px 520px at 110% -20%, rgba(245,198,97,.18), transparent 60%); --panel:#fff; --panel-2:#fff9ed; --text:#2a1f35; --muted:#6a587f; --gold:#7a5400; --accent:#5a3ed5; --ring:rgba(90,62,213,.25); --shadow:0 10px 24px rgba(48,34,66,.12); --border:1px solid rgba(34,20,50,.10); }
-    *{box-sizing:border-box} html,body{height:100%}
-    body{margin:0; font-family:Inter, system-ui, -apple-system, Segoe UI, Roboto, Arial; color:var(--text); background:var(--bg); background-image:var(--bg-accent)}
-    a{color:inherit; text-decoration:none} img{max-width:100%; display:block}
-    .container{width:min(1200px,94vw); margin-inline:auto}
-    header{position:sticky; top:0; z-index:50; backdrop-filter:blur(8px) saturate(1.1); background:linear-gradient(to bottom, rgba(8,5,12,.75), rgba(8,5,12,0)); border-bottom:var(--border)}
-    .nav{display:flex; align-items:center; justify-content:space-between; gap:16px; padding:14px 0}
-    .brand{display:flex; align-items:center; gap:12px}
-    .crest{width:36px; height:36px; border-radius:10px; display:grid; place-items:center; background:conic-gradient(from 230deg, #f5c661, #a685ff, #3dc7ab, #f5c661); color:#140c06; font-weight:900; box-shadow:var(--shadow)}
-    .title{font-family:Cinzel, serif; letter-spacing:.5px}
-    .actions{display:flex; gap:8px; align-items:center}
-    .btn{--_bg:var(--panel); --_fg:var(--text); border:var(--border); background:var(--_bg); color:var(--_fg); padding:10px 14px; border-radius:14px; font-weight:700; letter-spacing:.2px; cursor:pointer; transition:.2s ease}
-    .btn:hover{transform:translateY(-1px)} .btn.primary{background:linear-gradient(135deg, #f5c661, #a685ff); color:#1a1024; border-color:transparent; box-shadow:var(--shadow)}
-    .link{padding:8px 10px; border-radius:10px} .link.active{outline:4px solid var(--ring)}
 
-    .hero{padding:72px 0 24px} .hero-grid{display:grid; grid-template-columns:1.1fr .9fr; gap:26px; align-items:center}
-    .eyebrow{display:inline-flex; gap:8px; align-items:center; padding:6px 10px; border-radius:999px; border:1px solid rgba(255,255,255,.12); background:rgba(255,255,255,.06); font-size:13px; color:var(--muted)}
-    .h1{font-family:Cinzel, serif; font-size:clamp(28px, 3.8vw + 8px, 56px); line-height:1.06; letter-spacing:.5px; margin:12px 0}
-    .sub{color:var(--muted); font-size:clamp(16px, 1.2vw + 10px, 20px); max-width:60ch}
-    .hero-cta{display:flex; gap:12px; margin-top:18px; flex-wrap:wrap}
-    .glass{background:linear-gradient(180deg, rgba(255,255,255,.06), rgba(255,255,255,.03)); border:1px solid rgba(255,255,255,.12); border-radius:var(--radius); box-shadow:var(--shadow)}
-    .hero-card{padding:20px; display:grid; gap:14px}
-
-    .section{padding:48px 0}
-    .cards{display:grid; grid-template-columns:repeat(3,1fr); gap:14px}
-    .card{position:relative; border-radius:16px; overflow:hidden; background:var(--panel); border:var(--border); box-shadow:var(--shadow)}
-    .card-b{padding:14px} .card h3{margin:0 0 6px}
-
-    main{padding:26px 0 42px}
-    .grid{display:grid; grid-template-columns:320px 1fr; gap:18px}
-    .panel{background:var(--panel); border:var(--border); border-radius:var(--radius); box-shadow:var(--shadow)}
-    .panel-h{padding:16px 18px; border-bottom:var(--border); background:linear-gradient(180deg, rgba(255,255,255,.06), transparent)}
-    .panel-b{padding:16px 18px} .panel-b>*{margin:0 0 12px}
-    .field{display:grid; gap:6px} label{font-size:14px; color:var(--muted)}
-    input[type="text"], input[type="search"], select, textarea{font:inherit; color:var(--text); background:var(--panel-2); border:var(--border); border-radius:12px; padding:10px 12px; outline:none}
-    textarea{min-height:120px; resize:vertical} input[type="file"]{display:none}
-    .drop{border:2px dashed rgba(245,198,97,.35); border-radius:16px; padding:18px; text-align:center; background:linear-gradient(180deg, rgba(245,198,97,.07), rgba(166,133,255,.07))}
-    .drop.dragover{outline:4px solid var(--ring)}
-    .gallery{display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:14px}
-    .pcard img{width:100%; height:240px; object-fit:cover; background:#0b0b0f}
-    .row{display:flex; gap:8px; align-items:center; justify-content:space-between}
-    .iconbtn{background:transparent; border:var(--border); padding:6px 8px; border-radius:10px; cursor:pointer}
-
-    dialog#lightbox{border:none; padding:0; background:transparent}
-    .lightbox-wrap{background:rgba(0,0,0,.75); backdrop-filter:blur(4px); display:grid; place-items:center; width:100vw; height:100vh}
-    .lightbox{max-width:min(92vw,1100px); max-height:88vh; background:var(--panel); border:var(--border); border-radius:16px; box-shadow:var(--shadow); padding:10px}
-    .lightbox img{width:100%; height:60vh; object-fit:contain; background:#05050a}
-
-    footer{padding:24px 0 42px; color:var(--muted)}
-    @media (max-width:960px){ .hero-grid{grid-template-columns:1fr} .grid{grid-template-columns:1fr} .cards{grid-template-columns:1fr 1fr} }
-    @media (max-width:640px){ .cards{grid-template-columns:1fr} }
-  </style>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-</head>
-<body>
-  <header>
-    <div class="container nav">
-      <a class="brand" href="#/home">
-        <span class="crest" aria-hidden="true">✶</span>
-        <div>
-          <div class="title" style="font-size:18px">Fantasy Forge</div>
-          <small style="color:var(--muted)">Создавай своих D&D‑персонажей</small>
-        </div>
-      </a>
-      <nav class="actions" aria-label="Навигация">
-        <a class="link" data-link href="#/home">Главная</a>
-        <a class="link" data-link href="#/characters">Персонажи</a>
-        <button id="themeBtn" class="btn" type="button" aria-pressed="false">🌓 Тема</button>
-        <button id="cloudBtn" class="btn" type="button" title="Включить онлайн‑синхронизацию">☁ Онлайн: выкл</button>
-        <button id="settingsBtn" class="btn" type="button" title="Настройки облака">⚙ Настройки</button>
-        <button id="exportBtn" class="btn" type="button" title="Экспорт базы">⤴ Экспорт</button>
-        <button id="importBtn" class="btn" type="button" title="Импорт базы">⤵ Импорт</button>
-        <a class="btn primary" href="#/characters">Создать персонажа</a>
-      </nav>
-    </div>
-  </header>
-
-  <!-- ====== ВЬЮ: ГЛАВНАЯ ====== -->
-  <section id="view-home" class="container" hidden>
-    <div class="hero">
-      <div class="hero-grid">
-        <div>
-          <span class="eyebrow">⚔️ Герои, маги и легенды</span>
-          <h1 class="h1">Твоя личная кузница фэнтези‑персонажей</h1>
-          <p class="sub">Работает офлайн (в браузере). Хочешь онлайн‑доступ с базы данных и файлами? Нажми «Настройки» и подключи бесплатный Supabase (Postgres + Storage).</p>
-          <div class="hero-cta">
-            <a class="btn primary" href="#/characters">Начать создавать</a>
-            <a class="btn" href="#/home#features">Узнать больше</a>
-          </div>
-        </div>
-        <div class="glass hero-card" role="img" aria-label="Превью интерфейса">
-          <div style="display:grid; grid-template-columns:1.2fr .8fr; gap:14px; align-items:start">
-            <div class="glass" style="height:220px; border-radius:14px"></div>
-            <div style="display:grid; gap:14px">
-              <div class="glass" style="height:100px; border-radius:14px"></div>
-              <div class="glass" style="height:100px; border-radius:14px"></div>
-            </div>
-          </div>
-          <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:14px; margin-top:14px">
-            <div class="glass" style="height:68px; border-radius:12px"></div>
-            <div class="glass" style="height:68px; border-radius:12px"></div>
-            <div class="glass" style="height:68px; border-radius:12px"></div>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <div id="features" class="section">
-      <h2 class="title" style="font-family:Cinzel,serif">Почему это удобно</h2>
-      <div class="cards">
-        <article class="card"><div class="card-b"><h3>📸 Фото + описание</h3><p class="sub">Портреты и поля: раса, класс, происхождение, мировоззрение, заметки.</p></div></article>
-        <article class="card"><div class="card-b"><h3>☁ Облако</h3><p class="sub">Синхронизация с Supabase (бесплатный тариф). Хостинг на GitHub Pages/Netlify/Vercel.</p></div></article>
-        <article class="card"><div class="card-b"><h3>🗂 Экспорт/импорт</h3><p class="sub">Переноси базу одним JSON‑файлом.</p></div></article>
-      </div>
-    </div>
-  </section>
-
-  <!-- ====== ВЬЮ: ПЕРСОНАЖИ ====== -->
-  <main id="view-characters" class="container" hidden>
-    <div class="grid">
-      <aside class="panel" aria-label="Создание персонажа">
-        <div class="panel-h"><strong>Новый персонаж</strong></div>
-        <div class="panel-b">
-          <div class="drop" id="dropArea" tabindex="0" role="button" aria-label="Перетащите сюда изображение или выберите файл">
-            <p style="margin:4px 0 10px">Перетащите изображение сюда</p>
-            <div style="display:flex; gap:8px; justify-content:center; align-items:center">
-              <label for="avatarInput" class="btn">Выбрать файл</label>
-              <input id="avatarInput" type="file" accept="image/*" />
-              <span class="hint" style="color:var(--muted)">JPG/PNG/WebP, сжатие до 1600px</span>
-            </div>
-          </div>
-          <div class="field"><label for="name">Имя</label><input id="name" type="text" placeholder="Напр.: Aeliana Stormleaf" /></div>
-          <div class="field"><label for="race">Раса</label>
-            <select id="race"><option value="">—</option><option>Human</option><option>Elf</option><option>Dwarf</option><option>Halfling</option><option>Half‑Elf</option><option>Gnome</option><option>Tiefling</option><option>Dragonborn</option><option>Orc</option><option>Other</option></select>
-          </div>
-          <div class="field"><label for="cls">Класс</label>
-            <select id="cls"><option value="">—</option><option>Fighter</option><option>Rogue</option><option>Wizard</option><option>Cleric</option><option>Paladin</option><option>Ranger</option><option>Barbarian</option><option>Bard</option><option>Druid</option><option>Monk</option><option>Sorcerer</option><option>Warlock</option></select>
-          </div>
-          <div class="field"><label for="bg">Происхождение</label><input id="bg" type="text" placeholder="Напр.: Noble / Outlander" /></div>
-          <div class="field"><label for="aln">Мировоззрение</label><input id="aln" type="text" placeholder="Напр.: Lawful Good" /></div>
-          <div class="field"><label for="desc">Описание / заметки</label><textarea id="desc" placeholder="Короткая биография, внешность, черты характера..."></textarea></div>
-          <div class="row"><button id="createBtn" class="btn primary" type="button">Создать</button><button id="resetBtn" class="btn" type="button">Сбросить</button></div>
-        </div>
-      </aside>
-      <section style="display:grid; gap:14px">
-        <div class="panel">
-          <div class="panel-h" style="display:flex; align-items:center; justify-content:space-between">
-            <strong>Персонажи</strong>
-            <div style="display:flex; gap:8px; align-items:center">
-              <input id="search" type="search" placeholder="Поиск по имени, расе, классу..." style="min-width:240px" />
-              <button id="syncBtn" class="btn" type="button" title="Синхронизировать сейчас">↻ Синхронизировать</button>
-              <button id="shuffleBtn" class="btn" type="button">🔀 Перемешать</button>
-              <button id="clearBtn" class="btn" type="button">🗑 Очистить всё</button>
-            </div>
-          </div>
-          <div class="panel-b">
-            <div id="list" class="gallery" aria-live="polite"></div>
-            <p id="emptyNote" class="hint" style="text-align:center; margin-top:14px">Ещё нет персонажей. Добавьте слева.</p>
-          </div>
-        </div>
-      </section>
-    </div>
-  </main>
-
-  <!-- Модал просмотра персонажа -->
-  <dialog id="lightbox"><div class="lightbox-wrap" data-close><div class="lightbox" role="document"><img id="lbImg" alt="Просмотр изображения" /><div class="panel-b" style="display:grid; gap:8px"><h3 id="lbName" style="margin:0"></h3><div id="lbMeta" class="sub" style="color:var(--muted)"></div><div id="lbDesc"></div><div class="row"><button id="downloadBtn" class="btn" type="button">⬇ Скачать портрет</button><button class="btn" type="button" data-close>Закрыть</button></div></div></div></div></dialog>
-
-  <!-- Настройки облака -->
-  <dialog id="settingsDlg">
-    <div class="lightbox" role="document" style="padding:16px; max-width:min(92vw,760px)">
-      <h3 style="margin-top:0">⚙ Настройки онлайн‑доступа (Supabase)</h3>
-      <p class="sub" style="color:var(--muted)">Вставьте <b>Project URL</b> и <b>anon public key</b> вашего проекта Supabase, а также имя бакета для изображений. Хостить сайт можно на GitHub Pages/Netlify/Vercel бесплатно.</p>
-      <div class="field"><label for="supUrl">SUPABASE_URL</label><input id="supUrl" type="text" placeholder="https://xxxx.supabase.co" /></div>
-      <div class="field"><label for="supKey">SUPABASE_ANON_KEY</label><input id="supKey" type="text" placeholder="eyJhbGciOiJI... (anon)" /></div>
-      <div class="field"><label for="supBucket">Bucket (Storage)</label><input id="supBucket" type="text" placeholder="characters" /></div>
-      <div class="row"><button id="saveSettings" class="btn primary" type="button">Сохранить</button><button id="closeSettings" class="btn" type="button">Закрыть</button></div>
-      <p class="sub" style="color:var(--muted); margin-top:10px">Таблица: <code>characters</code> (id uuid, name text, race text, cls text, bg text, aln text, desc text, avatar_url text, added_at timestamptz)</p>
-    </div>
-  </dialog>
-
-  <footer class="container"><small>© <span id="year"></span> Fantasy Forge — офлайн/онлайн</small></footer>
-
-  <script>
-  // ===== Тема =====
-  (function(){ const root = document.documentElement; const saved = localStorage.getItem('theme'); const prefersLight = matchMedia('(prefers-color-scheme: light)').matches; if(saved){root.classList.toggle('light', saved==='light')} else {root.classList.toggle('light', prefersLight)}; const btn=document.getElementById('themeBtn'); function apply(next){root.classList.toggle('light', next==='light'); localStorage.setItem('theme', next); btn.setAttribute('aria-pressed', next==='light')} btn.addEventListener('click', ()=> apply(root.classList.contains('light')?'dark':'light')); btn.setAttribute('aria-pressed', root.classList.contains('light')); })();
-
-  // ===== Роутер =====
-  const VIEWS={home:document.getElementById('view-home'), characters:document.getElementById('view-characters')}; function route(){ const hash=location.hash.replace('#/','')||'home'; for(const [k,el] of Object.entries(VIEWS)) el.hidden=(k!==hash); document.querySelectorAll('[data-link]').forEach(a=> a.classList.toggle('active', a.getAttribute('href')===`#/${hash}`)); } addEventListener('hashchange', route); route();
-
-  // ===== Local DB =====
-  const DB_KEY='dndChars:v1'; let chars=[]; function saveLocal(){ try{localStorage.setItem(DB_KEY, JSON.stringify(chars))}catch(e){alert('Локально не сохранилось (слишком много данных). Экспортируйте часть.')} } function loadLocal(){ try{ chars=JSON.parse(localStorage.getItem(DB_KEY)||'[]') }catch{ chars=[] } }
-
-  // ===== Supabase (optional) =====
-  let supa=null, supaCfg=null; const CFG_KEY='ff:supa';
-  function loadCfg(){ try{return JSON.parse(localStorage.getItem(CFG_KEY)||'null')}catch{return null} }
-  function saveCfg(v){ localStorage.setItem(CFG_KEY, JSON.stringify(v||null)) }
-  async function initSupa(){
-    supaCfg=loadCfg(); if(!supaCfg||!supaCfg.url||!supaCfg.key||!supaCfg.bucket){ document.documentElement.dataset.mode='local'; return null; }
-    supa=window.supabase.createClient(supaCfg.url, supaCfg.key, {auth:{persistSession:false}});
-    document.getElementById('cloudBtn').textContent='☁ Онлайн: вкл'; document.documentElement.dataset.mode='cloud'; return supa;
-  }
-
-  // ===== UI refs =====
-  const avatarInput=document.getElementById('avatarInput'); const dropArea=document.getElementById('dropArea'); const nameEl=document.getElementById('name'); const raceEl=document.getElementById('race'); const clsEl=document.getElementById('cls'); const bgEl=document.getElementById('bg'); const alnEl=document.getElementById('aln'); const descEl=document.getElementById('desc'); const createBtn=document.getElementById('createBtn'); const resetBtn=document.getElementById('resetBtn');
-  const listEl=document.getElementById('list'); const emptyNote=document.getElementById('emptyNote'); const searchEl=document.getElementById('search'); const shuffleBtn=document.getElementById('shuffleBtn'); const clearBtn=document.getElementById('clearBtn'); const syncBtn=document.getElementById('syncBtn');
-  const settingsDlg=document.getElementById('settingsDlg'); const settingsBtn=document.getElementById('settingsBtn'); const saveSettings=document.getElementById('saveSettings'); const closeSettings=document.getElementById('closeSettings'); const supUrl=document.getElementById('supUrl'); const supKey=document.getElementById('supKey'); const supBucket=document.getElementById('supBucket'); const cloudBtn=document.getElementById('cloudBtn');
-
-  // ===== Dropzone =====
-  ;['dragenter','dragover'].forEach(ev=> dropArea.addEventListener(ev, e=>{ e.preventDefault(); dropArea.classList.add('dragover'); }));
-  ;['dragleave','drop'].forEach(ev=> dropArea.addEventListener(ev, e=>{ e.preventDefault(); dropArea.classList.remove('dragover'); }));
-  dropArea.addEventListener('drop', e=>{ const f=e.dataTransfer.files?.[0]; if(f) addAvatarFile(f); }); dropArea.addEventListener('click', ()=> avatarInput.click()); avatarInput.addEventListener('change', ()=>{ const f=avatarInput.files?.[0]; if(f) addAvatarFile(f); });
-  let currentAvatar=''; async function fileToDataURL(file){return new Promise((res,rej)=>{const r=new FileReader(); r.onload=()=>res(r.result); r.onerror=rej; r.readAsDataURL(file);});}
-  function imgFromSrc(src){return new Promise((res,rej)=>{const i=new Image(); i.onload=()=>res(i); i.onerror=rej; i.src=src;});}
-  async function resizeDataURL(dataUrl, max=1600){ const img=await imgFromSrc(dataUrl); const scale=Math.min(1, max/Math.max(img.width,img.height)); if(scale===1) return dataUrl; const c=document.createElement('canvas'); c.width=Math.round(img.width*scale); c.height=Math.round(img.height*scale); const ctx=c.getContext('2d'); ctx.imageSmoothingQuality='high'; ctx.drawImage(img,0,0,c.width,c.height); return c.toDataURL('image/jpeg', .9); }
-  async function addAvatarFile(file){ if(!file.type.startsWith('image/')){alert('Выберите изображение.'); return;} const raw=await fileToDataURL(file); currentAvatar=await resizeDataURL(raw,1600); dropArea.querySelector('p').textContent='Изображение выбрано — можно создавать персонажа'; }
-
-  // ===== Create character =====
-  createBtn.addEventListener('click', async ()=>{ const name=nameEl.value.trim(); if(!name){ alert('Имя обязательно.'); return; }
-    const item={ id: crypto.randomUUID(), name, race:raceEl.value, cls:clsEl.value, bg:bgEl.value, aln:alnEl.value, desc:descEl.value.trim(), avatar: currentAvatar, addedAt: Date.now() };
-    chars.unshift(item); saveLocal(); render();
-    if(document.documentElement.dataset.mode==='cloud'){ try{ await upsertCloud(item); }catch(e){ console.error(e); alert('В облако не отправилось: '+e.message); } }
-    // reset
-    nameEl.value=raceEl.value=clsEl.value=bgEl.value=alnEl.value=descEl.value=''; currentAvatar=''; dropArea.querySelector('p').textContent='Перетащите изображение сюда'; avatarInput.value='';
-  });
-  resetBtn.addEventListener('click', ()=>{ nameEl.value=raceEl.value=clsEl.value=bgEl.value=alnEl.value=descEl.value=''; currentAvatar=''; dropArea.querySelector('p').textContent='Перетащите изображение сюда'; avatarInput.value=''; });
-
-  // ===== List / actions =====
-  function escapeHtml(s){ return s.replace(/[&<>"']/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c])); }
-  function placeholderSvg(){ return `data:image/svg+xml;utf8,${encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#a685ff"/><stop offset="1" stop-color="#f5c661"/></linearGradient></defs><rect width="100%" height="100%" fill="#0b0b10"/><circle cx="400" cy="300" r="160" fill="url(#g)" opacity="0.35"/><text x="50%" y="50%" dominant-baseline="middle" text-anchor="middle" fill="#b8a9d9" font-family="Cinzel,serif" font-size="42">Fantasy</text></svg>')}`; }
-  function downloadDataUrl(dataUrl, filename){ const a=document.createElement('a'); a.href=dataUrl; a.download=filename; a.click(); }
-
-  listEl.addEventListener('input', (e)=>{ const id=e.target.getAttribute('data-edit-id'); if(!id) return; const it=chars.find(x=>x.id===id); if(!it) return; it.name=e.target.textContent.trim(); saveLocal(); if(document.documentElement.dataset.mode==='cloud'){ upsertCloud(it).catch(console.error); } });
-  listEl.addEventListener('click', (e)=>{ const id=e.target.getAttribute('data-del')||e.target.getAttribute('data-view')||e.target.getAttribute('data-dl'); if(!id) return; const it=chars.find(x=>x.id===id); if(!it) return; if(e.target.hasAttribute('data-del')){ if(confirm('Удалить персонажа?')){ chars=chars.filter(x=>x.id!==id); saveLocal(); render(); if(document.documentElement.dataset.mode==='cloud'){ deleteCloud(id).catch(console.error); } } } else if(e.target.hasAttribute('data-dl')){ downloadDataUrl(it.avatar||placeholderSvg(), (it.name||'portrait')+'.jpg'); } else if(e.target.hasAttribute('data-view')){ openLightbox(it); } });
-
-  function render(){ const q=(searchEl?.value||'').trim().toLowerCase(); listEl.innerHTML=''; const filtered=chars.filter(c=>`${c.name} ${c.race} ${c.cls}`.toLowerCase().includes(q)); emptyNote.style.display=filtered.length?'none':'block'; for(const c of filtered){ const el=document.createElement('article'); el.className='card pcard'; el.innerHTML=`<img alt="${escapeHtml(c.name)}" loading="lazy" src="${c.avatar||placeholderSvg()}" data-view="${c.id}" /><div class="card-b"><h3 contenteditable="true" spellcheck="false" data-edit-id="${c.id}">${escapeHtml(c.name)}</h3><div class="row"><span class="sub" style="color:var(--muted)">${escapeHtml([c.race,c.cls].filter(Boolean).join(' • '))||'&nbsp;'}</span><span class="row"><button class="iconbtn" title="Просмотр" data-view="${c.id}">🔍</button><button class="iconbtn" title="Скачать портрет" data-dl="${c.id}">⬇</button><button class="iconbtn" title="Удалить" data-del="${c.id}">🗑</button></span></div></div>`; listEl.appendChild(el); } }
-  searchEl.addEventListener('input', render); shuffleBtn.addEventListener('click', ()=>{ chars.sort(()=>Math.random()-.5); saveLocal(); render(); }); clearBtn.addEventListener('click', ()=>{ if(confirm('Очистить всю базу персонажей?')){ chars=[]; saveLocal(); render(); } });
-
-  // ===== Lightbox =====
-  const lb=document.getElementById('lightbox'); const lbImg=document.getElementById('lbImg'); const lbName=document.getElementById('lbName'); const lbMeta=document.getElementById('lbMeta'); const lbDesc=document.getElementById('lbDesc'); const dlBtn=document.getElementById('downloadBtn');
-  function openLightbox(it){ lbImg.src=it.avatar||placeholderSvg(); lbName.textContent=it.name; lbMeta.textContent=[it.race,it.cls,it.bg,it.aln].filter(Boolean).join(' • '); lbDesc.textContent=it.desc||''; dlBtn.onclick=()=> downloadDataUrl(it.avatar||placeholderSvg(), (it.name||'portrait')+'.jpg'); lb.showModal(); }
-  lb.addEventListener('click', (e)=>{ if(e.target.hasAttribute('data-close')) lb.close(); }); addEventListener('keydown', (e)=>{ if(e.key==='Escape'&&lb.open) lb.close(); });
-
-  // ===== Экспорт / Импорт =====
-  const exportBtn=document.getElementById('exportBtn'); const importBtn=document.getElementById('importBtn');
-  exportBtn.addEventListener('click', ()=>{ const blob=new Blob([JSON.stringify(chars)], {type:'application/json'}); const url=URL.createObjectURL(blob); const a=Object.assign(document.createElement('a'), {href:url, download:'dnd-characters-backup.json'}); a.click(); URL.revokeObjectURL(url); });
-  importBtn.addEventListener('click', async ()=>{ const inp=Object.assign(document.createElement('input'), {type:'file', accept:'application/json'}); inp.onchange=async ()=>{ const file=inp.files?.[0]; if(!file) return; try{ const data=JSON.parse(await file.text()); if(!Array.isArray(data)) throw new Error('Ожидается массив'); chars=data.filter(x=>x&&x.name); saveLocal(); render(); }catch(e){ alert('Не удалось импортировать: '+e.message); } }; inp.click(); });
-
-  // ===== Настройки облака =====
-  settingsBtn.addEventListener('click', ()=>{ const cfg=loadCfg()||{}; supUrl.value=cfg.url||''; supKey.value=cfg.key||''; supBucket.value=cfg.bucket||'characters'; settingsDlg.showModal(); });
-  closeSettings.addEventListener('click', ()=> settingsDlg.close());
-  saveSettings.addEventListener('click', async ()=>{ saveCfg({url:supUrl.value.trim(), key:supKey.value.trim(), bucket:supBucket.value.trim()||'characters'}); settingsDlg.close(); await initSupa(); });
-  cloudBtn.addEventListener('click', async ()=>{ if(document.documentElement.dataset.mode==='cloud'){ document.documentElement.dataset.mode='local'; cloudBtn.textContent='☁ Онлайн: выкл'; } else { await initSupa(); if(document.documentElement.dataset.mode!=='cloud') alert('Настройте Supabase в «⚙ Настройки»'); } });
-
-  // ===== Облачные операции =====
-  async function ensureSupa(){ return supa || await initSupa(); }
-  async function upsertCloud(item){ const c=await ensureSupa(); if(!c) throw new Error('Supabase не настроен'); let avatar_url=null; if(item.avatar){ const fileName=`${item.id}.jpg`; const base64=item.avatar.split(',')[1]; const bytes=Uint8Array.from(atob(base64), c=>c.charCodeAt(0)); await c.storage.from(supaCfg.bucket).upload(fileName, bytes, {contentType:'image/jpeg', upsert:true}); const { data: pub } = c.storage.from(supaCfg.bucket).getPublicUrl(fileName); avatar_url=pub.publicUrl; }
-    const payload={ id:item.id, name:item.name, race:item.race, cls:item.cls, bg:item.bg, aln:item.aln, desc:item.desc, avatar_url:avatar_url||null, added_at:new Date(item.addedAt).toISOString() };
-    const {error}=await c.from('characters').upsert(payload).select(); if(error) throw error; }
-  async function deleteCloud(id){ const c=await ensureSupa(); if(!c) return; await c.from('characters').delete().eq('id', id); await c.storage.from(supaCfg.bucket).remove([`${id}.jpg`]); }
-  async function pullCloud(){ const c=await ensureSupa(); if(!c) throw new Error('Supabase не настроен'); const { data, error } = await c.from('characters').select('*').order('added_at', {ascending:false}); if(error) throw error; // merge
-    const map=new Map(chars.map(x=>[x.id,x])); for(const r of data){ const local=map.get(r.id)||{}; map.set(r.id, { id:r.id, name:r.name||'', race:r.race||'', cls:r.cls||'', bg:r.bg||'', aln:r.aln||'', desc:r.desc||'', avatar: local.avatar || (r.avatar_url || ''), addedAt: r.added_at ? Date.parse(r.added_at) : (local.addedAt||Date.now()) }); }
-    chars=[...map.values()].sort((a,b)=>b.addedAt-a.addedAt); saveLocal(); render(); }
-  async function pushAll(){ const c=await ensureSupa(); if(!c) throw new Error('Supabase не настроен'); for(const it of chars){ await upsertCloud(it); } }
-  document.getElementById('syncBtn').addEventListener('click', async ()=>{ try{ if(document.documentElement.dataset.mode!=='cloud'){ await initSupa(); if(document.documentElement.dataset.mode!=='cloud') return alert('Настройте Supabase в «⚙ Настройки»'); }
-      await pullCloud(); await pushAll(); alert('Синхронизация завершена.'); } catch(e){ console.error(e); alert('Ошибка синхронизации: '+e.message); } });
-
-  // ===== Init =====
-  document.getElementById('year').textContent=new Date().getFullYear(); loadLocal(); render(); initSupa();
-  </script>
-</body>
-</html>
